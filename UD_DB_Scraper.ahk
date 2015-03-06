@@ -243,7 +243,25 @@ GrabText:
 	;Unit,UnitName,System,Customer,Enterprise,Division
 	Loop,Parse,StoreList,`n 
 	{
-		AddUnit(A_LoopField, system, Customer, Enterprise, Division)
+		hiddenTextStore := A_DetectHiddenText
+		DetectHiddenText, On
+		WinGetText, winText, ahk_class WindowsForms10.Window.8.app.0.33c0d9d
+		DetectHiddenText, %hiddenTextStore%
+		FoundPos := RegExMatch(winText, "[Ss]ystem\d{1,2}", SystemVar)
+		if (FoundPos = 0) {
+			FileAppend, %winText%`n`n, WinText.txt
+			InputBox, SystemInput, System Selection, Please enter system number:,,220,150,,,,,
+			if (errorlevel) {
+				return
+			}
+			RegExMatch(SystemInput, "\d{1,2}", SystemNumber)
+			SystemVar := "System" . SystemNumber
+		}
+	}
+	TrayTip, AutoHotkey, Parsing data to csv..., 10, 1
+	Sleep 500
+	;Unit,UnitName,System,Customer,Enterprise,Division
+	AddUnit(Store, SystemVar, Customer, Enterprise, Division)
 	}
 	TrayTip, AutoHotkey, Parsing data to csv..., 10, 1
 return
