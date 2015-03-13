@@ -179,18 +179,7 @@ Return
 	FileAppend, Exit forced by user.`n`n`n, UD_Scraper_Log.txt
 	GoSub,PauseScrape
 return
-
-^!p::
-	if !A_IsPaused
-	{
-		Pause
-		msgBox, % "Field1: " . Field1 . "`nField2: " . Field2
-	} else {
-		Pause
-	}
-return
 	
-
 GenerateSystemArray:
 	IniRead, ArrayCount, %A_WorkingDir%\CompassTweaks.ini, Last Run, SystemCount, -1
 	if (ArrayCount > 0) {
@@ -267,7 +256,7 @@ AddUnit(Store, System, Customer, Enterprise, Division, UnitNumber="new")
 		Loop, Read, %A_WorkingDir%\UD_DB.csv
 		{
 			if (ErrorLevel) {
-				msgBox, File Read Fail!
+				TrayTip, UD Scraper, File Read Fail!
 				break
 			}
 			unitDetails := StrSplit(A_LoopReadLine, ",")
@@ -285,7 +274,7 @@ AddUnit(Store, System, Customer, Enterprise, Division, UnitNumber="new")
 			Loop, Read, %A_ScriptDir%\UD_DB_New.csv
 			{
 				if (ErrorLevel) {
-					msgBox, File Read Fail!
+					TrayTip, UD Scraper, File Read Fail!
 					break
 				}
 				unitDetails := StrSplit(A_LoopReadLine, ",")
