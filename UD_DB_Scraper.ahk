@@ -1,13 +1,14 @@
 ;todo: add some help options to tray menu
 ;todo: integrate login details
-;todo: fully automate unit number parsing
 SetTitleMatchMode,2
 SendMode Input
 SetKeyDelay, 0, 10
+FormatTime, newDate, %A_Now%, yyMMdd
 
-csvFile := "UD_DB_New.csv"
+csvFile := A_ScriptDir . "\UD_DB_New_" . newDate . ".csv"
 manuallyStarted := false
 system :=
+newUnitsFound := 0
 
 IfNotExist, %A_AppData%/CompassAHKTweaks
 {
@@ -26,6 +27,8 @@ IfNotExist, %A_WorkingDir%\CompassTweaks.ini
 } else {
 	IniRead, UDEXE, %A_WorkingDir%\CompassTweaks.ini, Universal Desktop, Location
 }
+
+file := A_WorkingDir . "\UD_DB.csv"
 
 ;Bullet-Proof UD start-up
 Process, Exist, UniversalDesktop.exe
@@ -68,8 +71,7 @@ Scrape:
 	LoopCount := ArrayCount
 	Loop %LoopCount%
 	{
-		system := Array.Remove(1)
-		ArrayCount -= 1
+		system := Array[1]
 		FileAppend, Attempting scrape of %system%.  %ArrayCount% systems remaining.  Index %A_Index%`n, UD_Scraper_Log.txt
 		Sleep 500
 		errorlevel := 0
@@ -104,6 +106,8 @@ Scrape:
 			ControlSetText, WindowsForms10.EDIT.app.0.33c0d9d3, %Field2%, ahk_class WindowsForms10.Window.8.app.0.33c0d9d
 			TrayTip, UD Scraper, Continuing...
 			FileAppend, Unabled to login to %system%. Continuing to next system.`n, UD_Scraper_Log.txt
+			Array.Remove(1)
+			ArrayCount -= 1
 			Continue
 		}
 		IfWinExist, Universal Desktop,,Login
@@ -135,7 +139,7 @@ Scrape:
 			WinWait, Login ahk_class WindowsForms10.Window.8.app.0.33c0d9d, Getting Login, 3
 			WinWaitClose, Login ahk_class WindowsForms10.Window.8.app.0.33c0d9d, Getting Login, 30
 			GoSub,ResetTree
-			GoSub,TraverseCustomer
+			GoSub,TraverseTree
 			Sleep 300
 			ControlSend, Cancel, {Space}, ahk_class WindowsForms10.Window.8.app.0.33c0d9d
 			if (errorlevel) {
@@ -143,11 +147,21 @@ Scrape:
 				msgBox, Control send cancel failed. Exiting.
 				break
 			}
+			Array.Remove(1)
+			ArrayCount -= 1
 			FileAppend, Completed scrape of %system%.  %ArrayCount% systems remaining.`n, UD_Scraper_Log.txt
 			WinWaitActive, Login ahk_class WindowsForms10.Window.8.app.0.33c0d9d,,3
 		}
 	}
-	msgBox Data Scrape complete!
+	if (newUnitsFound) {
+		msgBox, % "Data Scrape complete!`n" . newUnitsFound . " new units found."
+		try
+			Run, % csvFile
+		catch
+			MsgBox, % "Unable to find or launch " . csvFile
+	} else {
+		msgBox, % "Data Scrape complete!`nNo new units discovered."
+	}
 	GoSub,PauseScrape
 return
 
@@ -231,7 +245,7 @@ GrabText:
 	
 	;Unit,UnitName,System,Customer,Enterprise,Division
 	Loop,Parse,StoreList,`n 
-	{
+	{	
 		AddUnit(A_LoopField, system, Customer, Enterprise, Division)
 	}
 	TrayTip, AutoHotkey, Parsing data to csv..., 10, 1
@@ -249,11 +263,14 @@ ParseUnitNumber(unit)
 }
 
 AddUnit(Store, System, Customer, Enterprise, Division, UnitNumber="new")
-{
+{	
+	global newUnitsFound
+	global file
 	UnitFound := false
-	IfExist, %A_WorkingDir%\UD_DB.csv
+	
+	IfExist, %file%
 	{
-		Loop, Read, %A_WorkingDir%\UD_DB.csv
+		Loop, Read, %file%
 		{
 			if (ErrorLevel) {
 				TrayTip, UD Scraper, File Read Fail!
@@ -269,9 +286,9 @@ AddUnit(Store, System, Customer, Enterprise, Division, UnitNumber="new")
 			If UnitFound
 				break
 		}
-		If !UnitFound 
+		If !UnitFound and FileExist(csvFile)
 		{
-			Loop, Read, %A_ScriptDir%\UD_DB_New.csv
+			Loop, Read, %csvFile%
 			{
 				if (ErrorLevel) {
 					TrayTip, UD Scraper, File Read Fail!
@@ -289,23 +306,39 @@ AddUnit(Store, System, Customer, Enterprise, Division, UnitNumber="new")
 			}
 			If !UnitFound
 			{
-				If (UnitNumber = "new") {
-					UnitNumber := ParseUnitNumber(Store)
-					If (UnitNumber = "acketz")
-						return
-				}
-				FileAppend, %UnitNumber%`,%Store%`,%system%`,%Customer%`,%Enterprise%`,%Division%`n, %A_ScriptDir%\UD_DB_New.csv
+				AddToCSV(Store, System, Customer, Enterprise, Division, UnitNumber)
+			}
+		} else {
+			If !UnitFound
+			{
+				AddToCSV(Store, System, Customer, Enterprise, Division, UnitNumber)
 			}
 		}
 	} else {
-		If (UnitNumber = "new") {
-			UnitNumber := ParseUnitNumber(Store)
-			If (UnitNumber = "acketz")
-				return
-		}
+		AddToCSV(Store, System, Customer, Enterprise, Division, UnitNumber)
 		FileAppend, %UnitNumber%`,%Store%`,%system%`,%Customer%`,%Enterprise%`,%Division%`n, %A_ScriptDir%\UD_DB_BrandNew.csv
 	}
 Return
+}
+
+AddToCSV(Store, System, Customer, Enterprise, Division, UnitNumber)
+{
+	global file
+	global csvFile
+	global newUnitsFound
+	
+	If (UnitNumber = "new") {
+		UnitNumber := ParseUnitNumber(Store)
+		If (UnitNumber = "new") {
+			msgBox, % "WTF Mate, Unit Number Parse failed"
+			return
+		}
+		If (UnitNumber = "acketz" or UnitNumber = "z")
+			return
+	}
+	newUnitsFound++
+	FileAppend, %UnitNumber%`,%Store%`,%system%`,%Customer%`,%Enterprise%`,%Division%`n, %csvFile%
+	FileAppend, %UnitNumber%`,%Store%`,%system%`,%Customer%`,%Enterprise%`,%Division%`n, %file%
 }
 
 ResetTree:
@@ -315,6 +348,7 @@ ResetTree:
 	Control, Choose, 1, WindowsForms10.COMBOBOX.app.0.33c0d9d1
 return
 
+TraverseTree:
 TraverseCustomer:
 {
 	TrayTip, AutoHotkey, Traversing Customer!, 10, 1
