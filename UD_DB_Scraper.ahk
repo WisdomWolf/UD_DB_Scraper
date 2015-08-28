@@ -77,8 +77,13 @@ Scrape:
 		errorlevel := 0
 		Control, ChooseString, %system%, WindowsForms10.COMBOBOX.app.0.33c0d9d1, ahk_class WindowsForms10.Window.8.app.0.33c0d9d
 		if (errorlevel) {
-			Sleep 200
-			Control, ChooseString, %system%, WindowsForms10.COMBOBOX.app.0.33c0d9d5, ahk_class WindowsForms10.Window.8.app.0.33c0d9d
+			Loop, 20 {
+				errorlevel := 0
+				Sleep 200
+				Control, ChooseString, %system%, WindowsForms10.COMBOBOX.app.0.33c0d9d5, ahk_class WindowsForms10.Window.8.app.0.33c0d9d
+				if (!errorlevel)
+					break
+			}
 			if (errorlevel) {
 				FileAppend, System select fail at: %system%.`n, UD_Scraper_Log.txt
 				MsgBox, System select fail at: %system%.
@@ -151,6 +156,10 @@ Scrape:
 			ArrayCount -= 1
 			FileAppend, Completed scrape of %system%.  %ArrayCount% systems remaining.`n, UD_Scraper_Log.txt
 			WinWaitActive, Login ahk_class WindowsForms10.Window.8.app.0.33c0d9d,,3
+			Sleep, 100
+			Control, EditPaste, %Field1%, WindowsForms10.EDIT.app.0.33c0d9d2, ahk_class WindowsForms10.Window.8.app.0.33c0d9d
+			Sleep, 100
+			ControlSetText, WindowsForms10.EDIT.app.0.33c0d9d3, %Field2%, ahk_class WindowsForms10.Window.8.app.0.33c0d9d
 		}
 	}
 	if (newUnitsFound) {
